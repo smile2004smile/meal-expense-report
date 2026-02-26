@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐费报销单</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .summary {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-item .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .summary-item .label {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .export-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 auto 30px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .export-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            background: #f8f9fa;
+            color: #495057;
+            font-weight: 600;
+            padding: 16px 12px;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+        }
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .img-cell {
+            width: 80px;
+        }
+        .img-cell img {
+            width: 60px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid #e9ecef;
+        }
+        .img-cell img:hover {
+            transform: scale(1.1);
+        }
+        .amount {
+            font-weight: 600;
+            color: #e74c3c;
+        }
+        .date {
+            color: #495057;
+            font-weight: 500;
+        }
+        .merchant {
+            color: #212529;
+            font-weight: 500;
+        }
+        .no-data {
+            color: #adb5bd;
+            font-style: italic;
+        }
+        .total-row {
+            background: #f8f9fa !important;
+            font-weight: bold;
+        }
+        .total-row td {
+            border-top: 2px solid #dee2e6;
+            border-bottom: none;
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading.active {
+            display: flex;
+        }
+        .loading-content {
+            background: white;
+            padding: 30px 50px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+            cursor: pointer;
+        }
+        .image-modal.active {
+            display: flex;
+        }
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ 餐费报销单</h1>
+            <p>2026年2月外卖订单汇总</p>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-item">
+                <div class="number" id="totalCount">8</div>
+                <div class="label">订单数量</div>
+            </div>
+            <div class="summary-item">
+                <div class="number" id="totalAmount">¥118.20</div>
+                <div class="label">报销总额</div>
+            </div>
+        </div>
+        
+        <div class="content">
+<!--            <button class="export-btn" onclick="exportToExcel()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                导出Excel报销单
+            </button> -->
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">序号</th>
+                        <th style="width: 100px;">截图</th>
+                        <th>商家名称</th>
+                        <th>支付时间</th>
+                        <th style="width: 100px;">金额</th>
+                    </tr>
+                </thead>
+                <tbody id="orderTable">
+                    <!-- 数据将通过JS动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>正在生成Excel...</p>
+        </div>
+    </div>
+    
+    <div class="image-modal" id="imageModal" onclick="closeModal()">
+        <img id="modalImage" src="" alt="订单截图">
+    </div>
+
+    <script>
+        // 订单数据
+        const orders = [
+            {
+                id: 1,
+                merchant: '米村拌饭（北京163店）',
+                time: '2026-02-12 19:48:42',
+                amount: 11.90,
+                image: '微信图片_20260226131348_125_24.jpg'
+            },
+            {
+                id: 2,
+                merchant: '抖音生活服务商家',
+                time: '2026-02-13 18:35:52',
+                amount: 11.90,
+                image: '微信图片_20260226131350_126_24.jpg'
+            },
+            {
+                id: 4,
+                merchant: '煲仔皇腊味煲仔饭（世贸天阶店）',
+                time: '2026-02-14',
+                amount: 12.60,
+                image: '微信图片_20260226131357_128_24.jpg'
+            },
+            {
+                id: 5,
+                merchant: '田老师红烧肉-甜水园店',
+                time: '2026-02-15 19:01:30',
+                amount: 11.40,
+                image: '微信图片_20260226131400_129_24.jpg'
+            },
+            {
+                id: 6,
+                merchant: '田老师红烧肉-甜水园店',
+                time: '2026-02-15 13:12:33',
+                amount: 12.40,
+                image: '微信图片_20260226131403_130_24.jpg'
+            },
+			{
+			    id: 7,
+			    merchant: '永和大王 现磨豆浆 卤肉饭',
+			    time: '2026-02-15 09:25:12',
+			    amount: 10.90,
+			    image: '微信图片_20260226131407_131_24.jpg'
+			},
+			{
+			    id: 8,
+			    merchant: '七鲜超市',
+			    time: '2026-02-16',
+			    amount: 10.95,
+			    image: '微信图片_20260226131411_132_24.jpg'
+			},
+            {
+                id: 9,
+                merchant: '七鲜超市',
+                time: '2026-02-17',
+                amount: 10.27,
+                image: '微信图片_20260226131416_133_24.jpg'
+            },
+            {
+                id: 10,
+                merchant: '田老师红烧肉大排档（甜水园店）',
+                time: '2026-02-17 17:11:07',
+                amount: 21.80,
+                image: '微信图片_20260226131418_134_24.jpg'
+            },
+            {
+                id: 11,
+                merchant: '田老师红烧肉-东单店',
+                time: '2026-02-18 14:19:43',
+                amount: 14.90,
+                image: '微信图片_20260226131421_135_24.jpg'
+            },
+			{
+			    id: 12,
+			    merchant: '田老师红烧肉-甜水园店',
+			    time: '2026-02-19 13:40:05',
+			    amount: 16.9,
+			    image: '微信图片_20260226141709_144_24.jpg'
+			},
+			{
+			    id: 13,
+			    merchant: '田老师红烧肉-甜水园店',
+			    time: '2026-02-1918:00:55',
+			    amount: 12.4,
+			    image: '微信图片_20260226141710_145_24.jpg'
+			},
+			{
+			    id: 14,
+			    merchant: '田老师红烧肉-甜水园店',
+			    time: '2026-02-20 11:27:12',
+			    amount: 13.4,
+			    image: '微信图片_20260226141711_146_24.jpg'
+			},
+			{
+			    id: 15,
+				merchant: '其家【堂食】_北京好世界店',
+				time: '2026年2月20日 18:51:37',
+				amount: 19.00,
+				image: '微信图片_20260226141714_148_24.jpg'
+			    
+			},
+			{
+			    id: 16,
+			    merchant: '京东七鲜超市',
+			    time: '2026年2月21日19:41:10',
+			    amount: 16.99,
+			    image: '微信图片_20260226141715_149_24.jpg',
+			},
+			{
+			    id: 17,
+				merchant: '老乡鸡(呼家楼店)',
+				time: '2026/02/22 18:34',
+				amount: 14.99,
+				image: '微信图片_20260226141713_147_24.jpg'
+			},
+			{
+			    id: 18,
+			    merchant: '老乡鸡(呼家楼店)',
+			    time: '2026年02月23日 18:33:41',
+			    amount: 16.90,
+			    image: '微信图片_20260226142653_150_24.jpg'
+			},
+			{
+			    id: 19,
+			    merchant: '米村拌饭',
+			    time: '2026年2月24日 18:29:15',
+			    amount: 15.90,
+			    image: '微信图片_20260226142655_151_24.jpg'
+			},
+        ];
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('orderTable');
+            let html = '';
+            let validTotal = 0;
+            let validCount = 0;
+            
+            orders.forEach(order => {
+                if (!order.noData) {
+                    validTotal += order.amount;
+                    validCount++;
+                }
+                
+                html += `
+                    <tr>
+                        <td>${order.id}</td>
+                        <td class="img-cell">
+                            <img src="${order.image}" alt="订单截图" onclick="showImage('${order.image}', event)">
+                        </td>
+                        <td class="merchant">${order.merchant}</td>
+                        <td class="date">${order.time}</td>
+                        <td class="amount">${order.noData ? '<span class="no-data">-</span>' : '¥' + order.amount.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            // 添加合计行
+            html += `
+                <tr class="total-row">
+                    <td colspan="4" style="text-align: right;">合计（有效订单）：</td>
+                    <td class="amount">¥${validTotal.toFixed(2)}</td>
+                </tr>
+            `;
+            
+            tbody.innerHTML = html;
+            
+            // 更新汇总
+            document.getElementById('totalCount').textContent = validCount;
+            document.getElementById('totalAmount').textContent = '¥' + validTotal.toFixed(2);
+        }
+
+        // 显示大图
+        function showImage(src, event) {
+            event.stopPropagation();
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('modalImage');
+            img.src = src;
+            modal.classList.add('active');
+        }
+
+        // 关闭大图
+        function closeModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        // 导出Excel
+        async function exportToExcel() {
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+            
+            try {
+                const workbook = new ExcelJS.Workbook();
+                const worksheet = workbook.addWorksheet('餐费报销单');
+                
+                // 设置列宽
+                worksheet.columns = [
+                    { width: 8 },   // 序号
+                    { width: 20 },  // 商家名称
+                    { width: 22 },  // 支付时间
+                    { width: 12 },  // 金额
+                    { width: 15 }   // 图片
+                ];
+                
+                // 添加标题
+                worksheet.mergeCells('A1:E1');
+                const titleCell = worksheet.getCell('A1');
+                titleCell.value = '餐费报销单';
+                titleCell.font = { size: 18, bold: true, color: { argb: 'FF667EEA' } };
+                titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                titleCell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF8F9FA' }
+                };
+                worksheet.getRow(1).height = 40;
+                
+                // 添加副标题
+                worksheet.mergeCells('A2:E2');
+                const subtitleCell = worksheet.getCell('A2');
+                subtitleCell.value = '2026年2月外卖订单汇总';
+                subtitleCell.font = { size: 11, color: { argb: 'FF6C757D' } };
+                subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                worksheet.getRow(2).height = 25;
+                
+                // 添加表头
+                const headerRow = worksheet.getRow(4);
+                headerRow.values = ['序号', '商家名称', '支付时间', '金额', '截图'];
+                headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                headerRow.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF667EEA' }
+                };
+                headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+                headerRow.height = 30;
+                
+                // 添加数据行
+                let rowIndex = 5;
+                let validTotal = 0;
+                
+                for (const order of orders) {
+                    if (order.noData) continue;
+                    
+                    validTotal += order.amount;
+                    const row = worksheet.getRow(rowIndex);
+                    row.values = [order.id, order.merchant, order.time, order.amount];
+                    row.height = 100;
+                    row.alignment = { vertical: 'middle' };
+                    
+                    // 格式化金额单元格
+                    const amountCell = row.getCell(4);
+                    amountCell.numFmt = '¥#,##0.00';
+                    amountCell.font = { color: { argb: 'FFE74C3C' }, bold: true };
+                    
+                    // 添加图片
+                    try {
+                        const imageId = workbook.addImage({
+                            filename: order.image,
+                            extension: 'jpeg'
+                        });
+                        worksheet.addImage(imageId, {
+                            tl: { col: 4, row: rowIndex - 1 },
+                            ext: { width: 80, height: 100 },
+                            editAs: 'oneCell'
+                        });
+                    } catch (e) {
+                        console.log('图片加载失败:', order.image);
+                    }
+                    
+                    rowIndex++;
+                }
+                
+                // 添加合计行
+                const totalRow = worksheet.getRow(rowIndex);
+                totalRow.values = ['', '', '合计', validTotal, ''];
+                totalRow.font = { bold: true };
+                totalRow.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF8F9FA' }
+                };
+                totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
+                totalRow.height = 30;
+                
+                // 合并合计行的前两个单元格
+                worksheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+                const totalLabelCell = worksheet.getCell(`A${rowIndex}`);
+                totalLabelCell.value = '合计（有效订单）：';
+                totalLabelCell.alignment = { horizontal: 'right', vertical: 'middle' };
+                
+                // 格式化合计金额
+                const totalAmountCell = worksheet.getCell(`D${rowIndex}`);
+                totalAmountCell.numFmt = '¥#,##0.00';
+                totalAmountCell.font = { color: { argb: 'FFE74C3C' }, bold: true };
+                
+                // 添加边框
+                for (let i = 4; i <= rowIndex; i++) {
+                    for (let j = 1; j <= 5; j++) {
+                        const cell = worksheet.getCell(i, j);
+                        cell.border = {
+                            top: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                            left: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                            bottom: { style: 'thin', color: { argb: 'FFDEE2E6' } },
+                            right: { style: 'thin', color: { argb: 'FFDEE2E6' } }
+                        };
+                    }
+                }
+                
+                // 保存文件
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                saveAs(blob, `餐费报销单_2026年2月.xlsx`);
+                
+            } catch (error) {
+                alert('导出失败：' + error.message);
+                console.error(error);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // 初始化
+        renderTable();
+    </script>
+</body>
+</html>
